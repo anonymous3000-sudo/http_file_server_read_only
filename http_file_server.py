@@ -78,4 +78,4 @@ def download():
     return send_from_directory(os.path.dirname(abs_path), os.path.basename(abs_path), as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,host='0.0.0.0')
