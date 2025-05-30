@@ -1,4 +1,4 @@
-from flask import Flask, request, send_from_directory, render_template_string, abort
+from flask import Flask, request, send_from_directory, render_template_string, abort, redirect, url_for
 import os
 import sys
 from werkzeug.security import safe_join
@@ -26,7 +26,7 @@ TEMPLATE = '''
     <title>Файловый менеджер</title>
 </head>
 <body>
-    <h1>Файловый менеджер - Текущая директория: /{{ current_path }}</h1>
+    <h1>Файловый менеджер - Содержимое директории: /{{ current_path }}</h1>
     <ul>
         {% if parent_path %}
             <li><a href="/?path={{ parent_path }}">.. (вверх)</a></li>
@@ -41,6 +41,21 @@ TEMPLATE = '''
             </li>
         {% endfor %}
     </ul>
+    <hr>
+    <!-- Форма загрузки файла -->
+    <h3>Загрузить файл</h3>
+    <form method="post" action="/upload" enctype="multipart/form-data">
+        <input type="hidden" name="path" value="{{ current_path }}">
+        <input type="file" name="file" required>
+        <button type="submit">Add file</button>
+    </form>
+    <!-- Форма создания новой папки -->
+    <h3>Создать папку</h3>
+    <form method="post" action="/mkdir">
+        <input type="hidden" name="path" value="{{ current_path }}">
+        <input type="text" name="folder" placeholder="Название папки" required>
+        <button type="submit">Add path</button>
+    </form>
 </body>
 </html>
 '''
@@ -77,5 +92,35 @@ def download():
         abort(404)
     return send_from_directory(os.path.dirname(abs_path), os.path.basename(abs_path), as_attachment=True)
 
+@app.route('/upload', methods=['POST'])
+@auth.login_required
+def upload():
+    path = request.form.get('path', '')
+    abs_path = safe_join(ROOT_DIR, path)
+    if abs_path is None or not os.path.isdir(abs_path):
+        abort(404)
+    file = request.files.get('file')
+    if not file:
+        abort(400)
+    filename = file.filename
+    # Сохраняем файл в текущую директорию
+    file.save(os.path.join(abs_path, filename))
+    return redirect(url_for('index', path=path))
+
+@app.route('/mkdir', methods=['POST'])
+@auth.login_required
+def mkdir():
+    path = request.form.get('path', '')
+    folder_name = request.form.get('folder', '')
+    abs_path = safe_join(ROOT_DIR, path)
+    if abs_path is None or not os.path.isdir(abs_path):
+        abort(404)
+    new_folder_path = safe_join(abs_path, folder_name)
+    try:
+        os.mkdir(new_folder_path)
+    except Exception as e:
+        abort(400, description=str(e))
+    return redirect(url_for('index', path=path))
+
 if __name__ == '__main__':
-    app.run(debug=True,host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0')
